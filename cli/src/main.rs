@@ -1,5 +1,4 @@
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Duration;
 
 use colored::Colorize;
@@ -13,14 +12,31 @@ use moonbois_core::rpc::MoonboisClientError;
 use moonbois_core::ProjectDTO;
 use moonbois_core::UserDTO;
 use moonbois_core::WalletDTO;
-use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signer::Signer;
 use crossterm::event::KeyCode;
 use crossterm::event;
-use spl_associated_token_account::get_associated_token_address;
+
+pub struct UserStore {
+    inner: UserDTO,
+}
+
+impl UserStore {
+    pub async fn update_balances(&mut self, rpc_client: &MoonboisClient) -> Result<(), MoonboisClientError> {
+        let balances = rpc_client.get_user_balances().await?;
+        self.inner.sol_balance = balances.user.sol_balance;
+        for (public_key, wallet) in self.inner.wallets.iter_mut() {
+            if let Some(value) = balances.wallets.get(&public_key) {
+                wallet.sol_balance = value.sol_balance;
+                wallet.token_balance = value.token_balance;
+            }
+        }
+
+        Ok(())
+    }
+}
 
 static BANNER: &str = r#"           
         :::   :::    ::::::::   ::::::::  ::::    ::: :::::::::   :::::::: ::::::::::: :::::::: 
@@ -37,7 +53,6 @@ async fn main() {
     std::process::Command::new("clear").status().unwrap();
     println!("{}\n", BANNER);
     dotenv::dotenv().ok();
-    let solana = Arc::new(RpcClient::new("http://127.0.0.1:8000/solana".to_string()));
     let mut rpc_client = MoonboisClient::new();
 
     let private_key: String = Input::new()
@@ -74,28 +89,23 @@ async fn main() {
             _ => panic!("{err}")
         };
     }
-
     let user = rpc_client.get_user().await.unwrap();
+    let mut user_store = UserStore {
+        inner: user
+    };
 
-    main_menu(&user, &solana, &rpc_client, &credentials).await;
+    main_menu(&rpc_client, &mut user_store, &credentials).await;
 }
 
-async fn main_menu(user: &UserDTO, solana: &Arc<RpcClient>, rpc_client: &MoonboisClient, credentials: &Credentials) {
-    std::process::Command::new("clear").status().unwrap();
-    println!(
-        "{BANNER}\nLogged in as: {}\nFunding: {}", 
-        credentials.signer.pubkey().to_string().on_red(), 
-        user.public_key
-    );
-
+async fn main_menu(rpc_client: &MoonboisClient, user_store: &mut UserStore, credentials: &Credentials) {
     loop {
-        let balance = solana.get_balance(&user.public_key).await.unwrap();
         std::process::Command::new("clear").status().unwrap();
         println!(
-            "{BANNER}\nLogged in as: {}\nFunding: {}\nSOL Balance: {}\n", 
+            "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\n Sniper SOL Balance: {}", 
             credentials.signer.pubkey().to_string().on_red(), 
-            user.public_key,
-            balance as f64 / LAMPORTS_PER_SOL as f64, 
+            user_store.inner.public_key,
+            user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
+            user_store.inner.wallets.iter().map(|wallet| wallet.1.sol_balance).reduce(|a, b| a + b).unwrap() as f64 / LAMPORTS_PER_SOL as f64, 
         );
 
         let selections = vec!["New Project", "Load Project", "Wallets", "Recover SOL", "Export", "Exit"];
@@ -108,17 +118,18 @@ async fn main_menu(user: &UserDTO, solana: &Arc<RpcClient>, rpc_client: &Moonboi
             .unwrap() {
                 0 => {
                     if let Some(project) = create_project(rpc_client).await {
-                        project_menu(project, user, solana, rpc_client, credentials).await;
+                        project_menu(project, user_store, rpc_client, credentials).await;
                     }
                 },
                 1 => {
                     if let Some(project) = load_project(&rpc_client).await {
-                        project_menu(project, user, solana, rpc_client, credentials).await;
+                        project_menu(project, user_store, rpc_client, credentials).await;
                     }
                 },
                 2 => {
-                    while let Some(wallet) = wallet_select(&user, solana, None).await {
-                        wallet_menu(wallet, user, solana, credentials, rpc_client).await;
+                    let selected_wallet = wallet_select(user_store).await;
+                    if let Some(wallet) = selected_wallet {
+                        wallet_menu(&wallet, user_store, credentials, rpc_client).await;
                     }
                 }
                 3 => {
@@ -155,22 +166,25 @@ async fn main_menu(user: &UserDTO, solana: &Arc<RpcClient>, rpc_client: &Moonboi
     std::process::Command::new("clear").status().unwrap();
 }
 
-async fn wallet_menu(wallet: &WalletDTO, user: &UserDTO, solana: &Arc<RpcClient>, credentials: &Credentials, rpc_client: &MoonboisClient) {
+async fn wallet_menu(wallet: &WalletDTO, user_store: &mut UserStore, credentials: &Credentials, rpc_client: &MoonboisClient) {
     std::process::Command::new("clear").status().unwrap();
     println!(
-        "{BANNER}\nLogged in as: {}\nFunding: {}\n", 
+        "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\n Sniper SOL Balance: {}", 
         credentials.signer.pubkey().to_string().on_red(), 
-        user.public_key
+        user_store.inner.public_key,
+        user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
+        user_store.inner.wallets.iter().map(|wallet| wallet.1.sol_balance).reduce(|a, b| a + b).unwrap() as f64 / LAMPORTS_PER_SOL as f64, 
     );
 
     loop {
-        let balance = solana.get_balance(&user.public_key).await.unwrap();
+        user_store.update_balances(rpc_client).await.unwrap();
         std::process::Command::new("clear").status().unwrap();
         println!(
-            "{BANNER}\nLogged in as: {}\nFunding: {}\nSOL Balance: {}\n", 
+            "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\n Sniper SOL Balance: {}", 
             credentials.signer.pubkey().to_string().on_red(), 
-            user.public_key,
-            balance as f64 / LAMPORTS_PER_SOL as f64, 
+            user_store.inner.public_key,
+            user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
+            user_store.inner.wallets.iter().map(|wallet| wallet.1.sol_balance).reduce(|a, b| a + b).unwrap() as f64 / LAMPORTS_PER_SOL as f64, 
         );
 
         let selections = vec![
@@ -217,7 +231,7 @@ async fn wallet_menu(wallet: &WalletDTO, user: &UserDTO, solana: &Arc<RpcClient>
 
                     let amount = (amount_in_sol * LAMPORTS_PER_SOL as f64) as u64;
 
-                    if let Err(err) = rpc_client.transfer_sol_from_sniper(wallet.id, user.public_key, amount).await {
+                    if let Err(err) = rpc_client.transfer_sol_from_sniper(wallet.id, user_store.inner.public_key, amount).await {
                         match err {
                             MoonboisClientError::ServerError(err) => {
                                 println!("\n{}\n  - {}", "Failed to withdraw SOL ⚠️".yellow(), err.dimmed());
@@ -264,40 +278,14 @@ async fn wallet_menu(wallet: &WalletDTO, user: &UserDTO, solana: &Arc<RpcClient>
         }
 }
 
-async fn wallet_select<'a>(user: &'a UserDTO, solana: &Arc<RpcClient>, mint: Option<Pubkey>) -> Option<&'a WalletDTO> {
-    let mut wallets = vec![];
-    let mut handles = vec![];
+async fn wallet_select<'a>(user_store: &mut UserStore) -> Option<WalletDTO> {
+    let mut selection = vec![];
 
-    for wallet in user.wallets.iter() {
-        let solana = Arc::clone(&solana);
-        let wallet = wallet.public_key.clone();
-        let handle = tokio::spawn(async move {
-            let balance = solana.get_balance(&wallet).await.unwrap();
-            let mut token_balance = None;
-
-            if let Some(mint) = mint {
-                let token_account = get_associated_token_address(
-                    &wallet,
-                    &mint,
-                );
-                if let Ok(result) = solana.get_token_account_balance(&token_account)
-                    .await {
-                        token_balance = result.ui_amount;
-                    }
-            }
-            
-            (wallet, balance, token_balance)
-        });
-
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        let (wallet, balance, token_balance) = handle.await.unwrap();
-        if let Some(token_balance) = token_balance {
-            wallets.push(format!("{} {} SOL {} TOKENS", wallet, balance as f64 / LAMPORTS_PER_SOL as f64, token_balance));
+    for (_, wallet) in user_store.inner.wallets.iter() {
+        if let Some(token_balance) = wallet.token_balance {
+            selection.push(format!("{} {} SOL {} TOKENS", wallet.public_key, wallet.sol_balance as f64 / LAMPORTS_PER_SOL as f64, token_balance));
         } else {
-            wallets.push(format!("{} {} SOL", wallet, balance as f64 / LAMPORTS_PER_SOL as f64));
+            selection.push(format!("{} {} SOL", wallet.public_key, wallet.sol_balance as f64 / LAMPORTS_PER_SOL as f64));
         }
     }
 
@@ -305,46 +293,62 @@ async fn wallet_select<'a>(user: &'a UserDTO, solana: &Arc<RpcClient>, mint: Opt
         .with_prompt("Wallets")
         .default(0)
         .items(&vec![
-            wallets, 
+            selection, 
             vec!["Back".to_string()]
         ].concat())
         .interact()
         .unwrap();
 
-    if index == user.wallets.len() { 
+    if index == user_store.inner.wallets.len() { 
         return None; 
     }
 
-    user.wallets.get(index)
+    None
 }
 
-async fn project_menu(mut project: ProjectDTO, user: &UserDTO, solana: &Arc<RpcClient>, rpc_client: &MoonboisClient, credentials: &Credentials) {
+async fn project_menu(mut project: ProjectDTO, user_store: &mut UserStore, rpc_client: &MoonboisClient, credentials: &Credentials) {
     std::process::Command::new("clear").status().unwrap();
-    println!(
-        "{BANNER}\nLogged in as: {}\nFunding: {}", 
-        credentials.signer.pubkey().to_string().on_red(),
-        user.public_key
-    );
+    if let Some(pumpfun) = &project.pumpfun {
+        println!(
+            "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\nProject: {}\nDeployer: {}\nMint ID: {}\n", 
+            credentials.signer.pubkey().to_string().on_red(), 
+            user_store.inner.public_key,
+            user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
+            project.name,
+            project.deployer,
+            pumpfun.mint_id,
+        );
+    } else {
+        println!(
+            "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\nProject: {}\nDeployer: {}\nMint: not_deployed\n", 
+            credentials.signer.pubkey().to_string().on_red(), 
+            user_store.inner.public_key,
+            user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
+            project.name,
+            project.deployer,
+        );
+    }
 
     loop {
-        let balance = solana.get_balance(&user.public_key).await.unwrap();
+        user_store.update_balances(rpc_client).await.unwrap();
+        // let balance = solana.get_balance(&user.public_key).await.unwrap();
         std::process::Command::new("clear").status().unwrap();
         if let Some(pumpfun) = &project.pumpfun {
             println!(
-                "{BANNER}\nLogged in as: {}\nFunding: {}\nSOL Balance: {}\nProject: {}\nDeployer: {}\nMint ID: {}\n", 
+                "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\nProject: {}\nDeployer: {}\nMint ID: {}\n", 
                 credentials.signer.pubkey().to_string().on_red(), 
-                user.public_key,
-                balance as f64 / LAMPORTS_PER_SOL as f64, 
+                user_store.inner.public_key,
+                user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
                 project.name,
                 project.deployer,
                 pumpfun.mint_id,
             );
         } else {
             println!(
-                "{BANNER}\nLogged in as: {}\nFunding: {}\nSOL Balance: {}\nProject: {}\nDeployer: {}\nMint: not_deployed\n", 
+                "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\nProject: {}\nDeployer: {}\nMint: not_deployed\n", 
                 credentials.signer.pubkey().to_string().on_red(), 
-                user.public_key,
-                balance as f64 / LAMPORTS_PER_SOL as f64, 
+                user_store.inner.public_key,
+                user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
                 project.name,
                 project.deployer,
             );
@@ -372,24 +376,24 @@ async fn project_menu(mut project: ProjectDTO, user: &UserDTO, solana: &Arc<RpcC
                                                 .interact()
                                                 .unwrap();
 
-                                            let balance = solana.get_balance(&user.public_key).await.unwrap();
+                                            // let balance = solana.get_balance(&user.public_key).await.unwrap();
                                             std::process::Command::new("clear").status().unwrap();
                                             if let Some(pumpfun) = &project.pumpfun {
                                                 println!(
-                                                    "{BANNER}\nLogged in as: {}\nFunding: {}\nSOL Balance: {}\nProject: {}\nDeployer: {}\nMint ID: {}\n", 
+                                                    "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\nProject: {}\nDeployer: {}\nMint ID: {}\n", 
                                                     credentials.signer.pubkey().to_string().on_red(), 
-                                                    user.public_key,
-                                                    balance as f64 / LAMPORTS_PER_SOL as f64, 
+                                                    user_store.inner.public_key,
+                                                    user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
                                                     project.name,
                                                     project.deployer,
                                                     pumpfun.mint_id,
                                                 );
                                             } else {
                                                 println!(
-                                                    "{BANNER}\nLogged in as: {}\nFunding: {}\nSOL Balance: {}\nProject: {}\nDeployer: {}\nMint: not_deployed\n", 
+                                                    "{BANNER}\nLogged in as: {}\nFunding: {}\nFunding SOL Balance: {}\nProject: {}\nDeployer: {}\nMint: not_deployed\n", 
                                                     credentials.signer.pubkey().to_string().on_red(), 
-                                                    user.public_key,
-                                                    balance as f64 / LAMPORTS_PER_SOL as f64, 
+                                                    user_store.inner.public_key,
+                                                    user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64, 
                                                     project.name,
                                                     project.deployer,
                                                 );
@@ -462,14 +466,14 @@ async fn project_menu(mut project: ProjectDTO, user: &UserDTO, solana: &Arc<RpcC
             .interact()
             .unwrap() {
                 0 => {
-                    let balance = solana.get_balance(&user.public_key).await.unwrap();
+                    // let balance = solana.get_balance(&user.public_key).await.unwrap();
                     std::process::Command::new("clear").status().unwrap();
-                    println!("{BANNER}\nLogged in as: {}\nSOL Balance: {}\n", 
+                    println!("{BANNER}\nLogged in as: {}\nFunding SOL Balance: {}\n", 
                         credentials.signer.pubkey().to_string().on_red(), 
-                        balance as f64 / LAMPORTS_PER_SOL as f64,
+                        user_store.inner.sol_balance as f64 / LAMPORTS_PER_SOL as f64,
                     );
 
-                    if let Some(wallet) = wallet_select(user, solana, project.pumpfun.clone().map(|x| x.mint_id)).await {
+                    if let Some(wallet) = wallet_select(user_store).await {
                         let amount_in_sol: f64 = Input::new()
                             .with_prompt("Enter the amount in sol")
                             .interact()
@@ -491,7 +495,7 @@ async fn project_menu(mut project: ProjectDTO, user: &UserDTO, solana: &Arc<RpcC
                     }
                 }
                 1 => {
-                    if let Some(wallet) = wallet_select(user, solana, project.pumpfun.clone().map(|x| x.mint_id)).await {
+                    if let Some(wallet) = wallet_select(user_store).await {
                         if let Err(err) = rpc_client.sell(project.id, wallet.id).await {
                             match err {
                                 MoonboisClientError::ServerError(err) => {
