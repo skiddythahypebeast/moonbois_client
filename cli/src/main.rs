@@ -193,8 +193,78 @@ impl App {
         let handler_response = menu.handle(&self.app_data).await;
         if let Err((menu, err)) = handler_response {
             match err {
-                AppError::MoonboisClientError(MoonboisClientError::ServerError(err)) => {
-                    println!("{}\n  - {}", "An error occured ⚠️".yellow(), err.dimmed());
+                AppError::MoonboisClientError(MoonboisClientError::UnhandledServerError(err)) => {
+                    println!("{}\n  - {}", "Unhandled server error occured ⚠️".yellow(), err.dimmed());
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, menu)).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::NotFound) => {
+                    println!("{}", "Requested resource was not found ⚠️".yellow());
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, menu)).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::InvalidUri(err)) => {
+                    println!("{}\n  - {}", "Invalid URI ⚠️".yellow(), err.to_string().dimmed());
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, menu)).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::JsonError(err)) => {
+                    println!("{}\n  - {}", "JSON error ⚠️".yellow(), err.to_string().dimmed());
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, menu)).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::MissingJWT) => {
+                    println!("{}", "Authorization failed ⚠️".yellow());
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, Menu::Login(Login))).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::ParseError(err)) => {
+                    println!("{}\n  - {}", "Parse error occured ⚠️".yellow(), err.to_string().dimmed());
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, menu)).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::ReqwestError(err)) => {
+                    println!("{}\n  - {}", "An error occured ⚠️".yellow(), err);
+                    Select::new()
+                        .items(&vec!["Back"])
+                        .default(0)
+                        .interact()
+                        .unwrap();
+
+                        let _ = Box::pin(App::run(self, menu)).await;
+                }
+                AppError::MoonboisClientError(MoonboisClientError::NotAccepted) => {
+                    println!("{}\n  - {}", "Not accepted ⚠️".yellow(), err.to_string().dimmed());
                     Select::new()
                         .items(&vec!["Back"])
                         .default(0)
@@ -204,7 +274,7 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::ParsePubkeyError(err) => {
-                    println!("{}\n  - {}", "An error occured ⚠️".yellow(), err.to_string().dimmed());
+                    println!("{}\n  - {}", "Invalid pubkey ⚠️".yellow(), err.to_string().dimmed());
                     Select::new()
                         .items(&vec!["Back"])
                         .default(0)
@@ -214,7 +284,7 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::DialogueError(err) => {
-                    println!("{}\n  - {}", "An error occured ⚠️".yellow(), err.to_string().dimmed());
+                    println!("{}\n  - {}", "Dialogue error occured ⚠️".yellow(), err.to_string().dimmed());
                     Select::new()
                         .items(&vec!["Back"])
                         .default(0)
@@ -234,7 +304,7 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::Unhandled(err) => {
-                    println!("{}\n - {}", "An error occured ⚠️".yellow(), err);
+                    println!("{}\n - {}", "Unhandled error occured ⚠️".yellow(), err);
                     Select::new()
                         .items(&vec!["Back"])
                         .default(0)
@@ -243,8 +313,8 @@ impl App {
 
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
-                _ => {
-                    println!("{}\n  - {}", "An error occured ⚠️".yellow(), err.to_string().dimmed());
+                AppError::UserNotFound => {
+                    println!("{}\n  - {}", "Unable to find user ⚠️".yellow(), err.to_string().dimmed());
                     Select::new()
                         .items(&vec!["Back"])
                         .default(0)
