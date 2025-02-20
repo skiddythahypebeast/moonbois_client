@@ -171,8 +171,9 @@ impl App {
         if let Some(active_project) = &self.app_data.active_project.read().await.0 {
             if let Some(project) = &self.app_data.projects.read().await.get(active_project) {
                 println!(
-                    "mint_id: {}",
-                    project.pumpfun.clone().map(|x| x.mint_id.to_string()).unwrap_or_else(|| "not_deployed".to_string())
+                    "mint_id: {}\ndeployer: {}",
+                    project.pumpfun.clone().map(|x| x.mint_id.to_string()).unwrap_or_else(|| "not_deployed".to_string()),
+                    project.deployer
                 )
             }
         }
