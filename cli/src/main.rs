@@ -96,7 +96,7 @@ impl Handler for Menu {
 
 pub struct App {
     app_data: Arc<AppData>,
-    socket_handle: JoinHandle<()>
+    socket_handle: JoinHandle<Result<(), String>>
 }
 impl App {
     pub fn new(app_data: Arc<AppData>) -> Self {
@@ -114,17 +114,17 @@ impl App {
                     let rpc_client = app_data_arc.rpc_client.read().await;
                     let projects = match rpc_client.get_user_projects().await {
                         Ok(projects) => projects,
-                        Err(_) => return
+                        Err(err) => return Err(err.to_string())
                     };
                     let mint_id = if let Some(project_id) = &app_data_arc.active_project.read().await.0 {
                         if let Some(project) = projects.get(project_id) {
-                            project.pumpfun.clone().map(|val| val.mint_id)
+                            Some(project.pumpfun.mint_id)
                         } else { None }
                     } else { None };
 
                     let balances = match rpc_client.get_user_balances(mint_id).await {
                         Ok(user) => user,
-                        Err(_) => return
+                        Err(err) => return Err(err.to_string())
                     };
 
                     drop(rpc_client);
@@ -172,7 +172,7 @@ impl App {
             if let Some(project) = &self.app_data.projects.read().await.get(active_project) {
                 println!(
                     "mint_id: {}\ndeployer: {}",
-                    project.pumpfun.clone().map(|x| x.mint_id.to_string()).unwrap_or_else(|| "not_deployed".to_string()),
+                    project.pumpfun.mint_id,
                     project.deployer
                 )
             }
@@ -181,7 +181,13 @@ impl App {
         println!("");
 
         if self.socket_handle.is_finished() {
-            println!("\n{}\n", "Websocket connection failed ⚠️".yellow());
+            let error_message = if let Err(err) = self.socket_handle.await.unwrap() {
+                err
+            } else {
+                "".to_string()
+            };
+
+            println!("\n{}\n{}", "Websocket connection failed ⚠️".yellow(), error_message.dimmed());
             Select::new()
                 .items(&vec!["Back"])
                 .default(0)

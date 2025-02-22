@@ -35,8 +35,6 @@ pub enum ProjectMenuOptions {
     Sell,
     AutoBuy,
     AutoSell,
-    CancelSnipe,
-    Snipe,
     Delete,
     Back
 }
@@ -48,8 +46,6 @@ impl ToString for ProjectMenuOptions {
             Self::Sell => "Sell".to_string(),
             Self::AutoBuy => "AutoBuy".to_string(),
             Self::AutoSell => "AutoSell".to_string(),
-            Self::CancelSnipe => "CancelSnipe".to_string(),
-            Self::Snipe => "Snipe".to_string(),
             Self::Delete => "Delete".to_string(),
             Self::Back => format!("{}", "Back".to_string().italic().underline(Color::White).dim())
         }
@@ -63,10 +59,8 @@ impl From<usize> for ProjectMenuOptions {
             1 => Self::Sell,
             2 => Self::AutoBuy,
             3 => Self::AutoSell,
-            4 => Self::Snipe,
-            5 => Self::CancelSnipe,
-            6 => Self::Delete,
-            7 => Self::Back,
+            4 => Self::Delete,
+            5 => Self::Back,
             _ => panic!("Received invalid project menu index")
         }
     }
@@ -74,43 +68,13 @@ impl From<usize> for ProjectMenuOptions {
 
 pub struct ProjectMenu;
 impl Handler for ProjectMenu {
-    async fn handle(self, app_data: &Arc<AppData>) -> Result<Option<Menu>, (Menu, AppError)> {
-        let projects = app_data.projects.read().await;
-        let active_project = app_data.active_project.read().await;
-        let project = if let Some(active_project_id) = active_project.0 {
-            match projects.get(&active_project_id).cloned() {
-                Some(project) => project,
-                None => return Err((Menu::Main(MainMenu), AppError::ProjectNotFound))
-            }
-        } else {
-            return Err((Menu::Main(MainMenu), AppError::ProjectNotFound))
-        };
-        drop(active_project);
-        drop(projects);
-
+    async fn handle(self, _app_data: &Arc<AppData>) -> Result<Option<Menu>, (Menu, AppError)> {
         let mut items = vec![];
 
-        if project.pumpfun.is_some() {
-            items.push(format!("{}", ProjectMenuOptions::Buy.to_string().white()));
-            items.push(format!("{}", ProjectMenuOptions::Sell.to_string().white()));
-            items.push(format!("{}", ProjectMenuOptions::AutoBuy.to_string().white()));
-            items.push(format!("{}", ProjectMenuOptions::AutoSell.to_string().white()));
-            items.push(format!("{}", ProjectMenuOptions::Snipe.to_string().dim()));
-            items.push(format!("{}", ProjectMenuOptions::CancelSnipe.to_string().dim()));
-        } else {
-            items.push(format!("{}", ProjectMenuOptions::Buy.to_string().dim()));
-            items.push(format!("{}", ProjectMenuOptions::Sell.to_string().dim()));
-            items.push(format!("{}", ProjectMenuOptions::AutoBuy.to_string().dim()));
-            items.push(format!("{}", ProjectMenuOptions::AutoSell.to_string().dim()));
-            if !project.pending_snipe {
-                items.push(format!("{}", ProjectMenuOptions::Snipe.to_string()));
-                items.push(format!("{}", ProjectMenuOptions::CancelSnipe.to_string().dim()));
-            } else {
-                items.push(format!("{}", ProjectMenuOptions::Snipe.to_string().dim()));
-                items.push(format!("{}", ProjectMenuOptions::CancelSnipe.to_string()));
-            }
-        }
-
+        items.push(format!("{}", ProjectMenuOptions::Buy.to_string().white()));
+        items.push(format!("{}", ProjectMenuOptions::Sell.to_string().white()));
+        items.push(format!("{}", ProjectMenuOptions::AutoBuy.to_string().white()));
+        items.push(format!("{}", ProjectMenuOptions::AutoSell.to_string().white()));
         items.push(ProjectMenuOptions::Delete.to_string());
         items.push(ProjectMenuOptions::Back.to_string());
 
@@ -130,8 +94,6 @@ impl Handler for ProjectMenu {
             ProjectMenuOptions::Sell => return Ok(Some(Menu::Sell(Sell { auto: false }))),
             ProjectMenuOptions::AutoBuy => return Ok(Some(Menu::Buy(Buy { auto: true }))),
             ProjectMenuOptions::AutoSell => return Ok(Some(Menu::Sell(Sell { auto: true }))),
-            ProjectMenuOptions::Snipe => return Ok(Some(Menu::CreateSnipe(CreateSnipe))),
-            ProjectMenuOptions::CancelSnipe => return Ok(Some(Menu::CancelSnipe(CancelSnipe))),
             ProjectMenuOptions::Delete => return Ok(Some(Menu::DeleteProject(DeleteProject))),
             ProjectMenuOptions::Back => return Ok(Some(Menu::Main(MainMenu))),
         };
@@ -145,6 +107,7 @@ impl Handler for CreateSnipe {
             Some(user) => user.wallets.len(),
             None => return Err((Menu::ProjectMenu(ProjectMenu), AppError::UserNotFound))
         };
+
         let wallet_count = Input::new()
             .with_prompt("Enter wallet amount")
             .default(5)
@@ -158,21 +121,16 @@ impl Handler for CreateSnipe {
             .interact()
             .unwrap();
 
-        let project_id = match app_data.active_project.read().await.0 {
-            Some(project_id) => project_id,
-            None => return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-        };
+        let deployer: Pubkey = Input::new()
+            .with_prompt("Enter the deployer address")
+            .interact()
+            .unwrap();
+
         let rpc_client = app_data.rpc_client.read().await;
-        rpc_client.create_snipe(project_id, wallet_count).await
+        let snipe_id = rpc_client.create_snipe(deployer, wallet_count).await
             .map_err(|err| {
                 (Menu::ProjectMenu(ProjectMenu), AppError::from(err))
             })?;
-        
-        if let Some(project) = app_data.projects.write().await.get_mut(&project_id) {
-            project.pending_snipe = true;
-        } else {
-            return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-        }
 
         let mut spinner = Spinner::new(
             spinners::Moon, 
@@ -180,6 +138,7 @@ impl Handler for CreateSnipe {
             None
         );
 
+        let task_snipe_id = snipe_id.clone();
         let cancel = tokio::spawn(async move {
             loop {
                 let event_happened = event::poll(Duration::from_millis(200)).unwrap();
@@ -187,7 +146,10 @@ impl Handler for CreateSnipe {
                     match event::read().unwrap() {
                         event::Event::Key(value) => {
                             if let KeyCode::Enter = value.code {
-                                return Ok::<Option<Menu>, (Menu, AppError)>(Some(Menu::CancelSnipe(CancelSnipe)))
+                                return Ok::<Option<Menu>, (Menu, AppError)>(Some(Menu::CancelSnipe(CancelSnipe {
+                                    deployer,
+                                    snipe_id: task_snipe_id
+                                })))
                             }
                         },
                         _ => ()
@@ -200,7 +162,7 @@ impl Handler for CreateSnipe {
         let polling = tokio::spawn(async move {
             loop {
                 let rpc_client = task_data.rpc_client.read().await;
-                let snipe_in_progress = match rpc_client.get_snipe_status(project_id).await {
+                let snipe_in_progress = match rpc_client.get_snipe_status(&deployer, &snipe_id).await {
                     Ok(result) => result,
                     Err(err) => {
                         return Err((Menu::ProjectMenu(ProjectMenu), AppError::from(err)))
@@ -208,19 +170,6 @@ impl Handler for CreateSnipe {
                 };
     
                 if !snipe_in_progress {
-                    let project_id = match task_data.active_project.read().await.0 {
-                        Some(project_id) => project_id,
-                        None => {
-                            return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-                        }
-                    };
-                    
-                    if let Some(project) = task_data.projects.write().await.get_mut(&project_id) {
-                        project.pending_snipe = snipe_in_progress;
-                    } else {
-                        return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-                    }
-
                     return Ok(Some(Menu::ProjectMenu(ProjectMenu)));
                 }
     
@@ -241,36 +190,24 @@ impl Handler for CreateSnipe {
     }
 }
 
-pub struct CancelSnipe;
+pub struct CancelSnipe {
+    snipe_id: String,
+    deployer: Pubkey
+}
 impl Handler for CancelSnipe {
     async fn handle(self, app_data: &Arc<AppData>) -> Result<Option<Menu>, (Menu, AppError)> {
-        let project_id = match app_data.active_project.read().await.0 {
-            Some(project_id) => project_id,
-            None => return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-        };
         let mut spinner = Spinner::new(spinners::Moon, format!("{}", "cancel_snipe in progress".dim()), None);
         let rpc_client = app_data.rpc_client.read().await;
-        rpc_client.cancel_snipe(project_id).await
+        rpc_client.cancel_snipe(&self.deployer, &self.snipe_id).await
             .map_err(|err| {
                 spinner.clear();
 
                 (Menu::Main(MainMenu), AppError::from(err))
             })?;
 
-        let project_id = match app_data.active_project.read().await.0 {
-            Some(project_id) => project_id,
-            None => return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-        };
-        
-        if let Some(project) = app_data.projects.write().await.get_mut(&project_id) {
-            project.pending_snipe = false;
-        } else {
-            return Err((Menu::ProjectMenu(ProjectMenu), AppError::ProjectNotFound))
-        }
-
         spinner.clear();
 
-        Ok(Some(Menu::ProjectMenu(ProjectMenu)))
+        Ok(Some(Menu::Main(MainMenu)))
     }
 }
 
@@ -444,28 +381,15 @@ impl Handler for Buy {
 pub struct CreateProject;
 impl Handler for CreateProject {
     async fn handle(self, app_data: &Arc<AppData>) -> Result<Option<Menu>, (Menu, AppError)> {
-        let deployer: Pubkey = Input::new()
-            .with_prompt("Enter the deployer public key")
-            .interact()
-            .unwrap();
-    
-        let name: String = Input::new()
-            .with_prompt("Enter the project name")
-            .allow_empty(false)
-            .validate_with(|input: &String| {
-                if input.len() > 10 {
-                    return Err("Name cannot use more than 10 characters");
-                };
-
-                Ok(())
-            })
+        let mint_id: Pubkey = Input::new()
+            .with_prompt("Enter the mint id")
             .interact()
             .unwrap();
     
         let rpc_client = app_data.rpc_client.read().await;
-        let project = match rpc_client.create_project(name, deployer).await {
+        let project = match rpc_client.create_project(mint_id).await {
             Ok(result) => result,
-            Err(err) => return Err((Menu::CreateProject(self), AppError::from(err)))
+            Err(err) => return Err((Menu::Main(MainMenu), AppError::from(err)))
         };
     
         let mut project_write = app_data.projects.write().await;
@@ -563,6 +487,7 @@ impl Handler for Signup {
 
 pub struct MainMenu;
 pub enum MainMenuOptions {
+    Snipe,
     NewProject,
     LoadProject,
     Wallets,
@@ -574,8 +499,9 @@ pub enum MainMenuOptions {
 impl ToString for MainMenuOptions {
     fn to_string(&self) -> String {
         match self {
-            Self::NewProject => "NewToken".to_string(),
-            Self::LoadProject => "LoadToken".to_string(),
+            Self::Snipe => "Snipe".to_string(),
+            Self::NewProject => "ImportToken".to_string(),
+            Self::LoadProject => "Tokens".to_string(),
             Self::Wallets => "Wallets".to_string(),
             Self::RecoverSOL => "RecoverSOL".to_string(),
             Self::Export => "Export".to_string(),
@@ -587,12 +513,13 @@ impl ToString for MainMenuOptions {
 impl From<usize> for MainMenuOptions {
     fn from(value: usize) -> Self {
         match value {
-            0 => Self::NewProject,
-            1 => Self::LoadProject,
-            2 => Self::Wallets,
-            3 => Self::RecoverSOL,
-            4 => Self::Export,
-            5 => Self::Exit,
+            0 => Self::Snipe,
+            1 => Self::NewProject,
+            2 => Self::LoadProject,
+            3 => Self::Wallets,
+            4 => Self::RecoverSOL,
+            5 => Self::Export,
+            6 => Self::Exit,
             _ => panic!("Received invalid main menu index")
         }
     }
@@ -609,6 +536,7 @@ impl Handler for MainMenu {
         drop(active_project);
 
         let selection = match FuzzySelect::new().with_prompt("Main menu").default(0).items(&vec![
+            MainMenuOptions::Snipe,
             MainMenuOptions::NewProject, 
             MainMenuOptions::LoadProject, 
             MainMenuOptions::Wallets, 
@@ -623,6 +551,7 @@ impl Handler for MainMenu {
         };
 
         match MainMenuOptions::from(selection) {
+            MainMenuOptions::Snipe => return Ok(Some(Menu::CreateSnipe(CreateSnipe))),
             MainMenuOptions::NewProject => return Ok(Some(Menu::CreateProject(CreateProject))),
             MainMenuOptions::LoadProject => return Ok(Some(Menu::SelectProject(SelectProject))),
             MainMenuOptions::Wallets => return Ok(Some(Menu::Wallet(WalletMenu))),
