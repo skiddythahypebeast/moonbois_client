@@ -161,11 +161,21 @@ impl App {
             let sniper_balance = user.wallets.iter().map(|(_, y)| y.sol_balance).reduce(|x, y| x + y).unwrap() as f64 / LAMPORTS_PER_SOL as f64;
             let user_balance = user.sol_balance as f64 / LAMPORTS_PER_SOL as f64;
             println!(
-                "fee_payer: {}\nfee_payer_balance: {}\nsniper_balance: {}",
+                "fee_payer: {}\nfee_payer_balance: {}\nsniper_sol_balance: {}",
                 user.public_key, 
                 format!("{} {}", user_balance, "SOL".cyan()),
-                format!("{} {}", sniper_balance, "SOL".cyan())
+                format!("{} {}", sniper_balance, "SOL".cyan()),
             );
+            if let Some(active_project) = &self.app_data.active_project.read().await.0 {
+                if let Some(project) = &self.app_data.projects.read().await.get(active_project) {
+                    let sniper_token_balance = user.wallets.iter().filter_map(|(_, x)| x.token_balance).reduce(|a, b| a + b).unwrap_or(0) as f64 / 10f64.powf(6f64);
+                    println!(
+                        "snipe_token_balance: {} {}",
+                        format!("{}", sniper_token_balance),
+                        format!("{}", project.name.to_uppercase().bright_magenta())
+                    )
+                }
+            }
         }
 
         if let Some(active_project) = &self.app_data.active_project.read().await.0 {

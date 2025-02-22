@@ -535,6 +535,13 @@ impl Handler for MainMenu {
         }
         drop(active_project);
 
+        let mut user = app_data.user.write().await;
+        if let Some(user) = &mut user.0 {
+            for (_, wallet) in user.wallets.iter_mut() {
+                wallet.token_balance = None;
+            }
+        }
+
         let selection = match FuzzySelect::new().with_prompt("Main menu").default(0).items(&vec![
             MainMenuOptions::Snipe,
             MainMenuOptions::NewProject, 
