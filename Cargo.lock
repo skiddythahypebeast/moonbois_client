@@ -705,7 +705,7 @@ dependencies = [
  "crossterm",
  "dialoguer",
  "dotenv",
- "moonbois_core",
+ "moonbois_core 0.1.0 (git+https://github.com/skiddythahypebeast/moonbois_core.git?branch=main)",
  "reqwest 0.12.12",
  "rocket",
  "serde",
@@ -2379,6 +2379,21 @@ dependencies = [
 [[package]]
 name = "moonbois_core"
 version = "0.1.0"
+dependencies = [
+ "reqwest 0.12.12",
+ "rocket",
+ "serde",
+ "serde_json",
+ "solana-sdk",
+ "thiserror 2.0.11",
+ "tokio-tungstenite 0.26.2",
+ "url",
+]
+
+[[package]]
+name = "moonbois_core"
+version = "0.1.0"
+source = "git+https://github.com/skiddythahypebeast/moonbois_core.git?branch=main#2b2b7603e0362ad89f0c234453b160d125c47276"
 dependencies = [
  "reqwest 0.12.12",
  "rocket",
