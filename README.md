@@ -2,6 +2,7 @@
 
 ### 1. Install dependencies
 <a href="https://www.rust-lang.org/tools/install">Install Rust</a>
+
 <a href="https://git-scm.com/book/en/v2/Getting-Started-Installing-Git">Install GIT</a>
 
 ### 2. Clone repository
