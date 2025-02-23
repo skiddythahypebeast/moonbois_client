@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use colored::Colorize;
+use console::style;
+use dialoguer::theme::ColorfulTheme;
 use dialoguer::Select;
 use handlers::Buy;
 use handlers::CancelSnipe;
 use handlers::CreateProject;
 use handlers::CreateSnipe;
 use handlers::DeleteProject;
+use handlers::DeleteWallet;
 use handlers::Deposit;
 use handlers::Export;
 use handlers::Handler;
+use handlers::ImportWallet;
 use handlers::RecoverSol;
 use handlers::SelectProject;
 use handlers::Login;
@@ -57,6 +60,8 @@ pub enum Menu {
     Signup(Signup),
     Wallet(WalletMenu),
     Send(SendSOL),
+    ImportWallet(ImportWallet),
+    DeleteWallet(DeleteWallet),
     Buy(Buy),
     DeleteProject(DeleteProject),
     CancelSnipe(CancelSnipe),
@@ -81,6 +86,8 @@ impl Handler for Menu {
             Menu::ProjectMenu(handler) => handler.handle(app_data).await,
             Menu::SelectProject(handler) => handler.handle(app_data).await,
             Menu::Buy(handler) => handler.handle(app_data).await, 
+            Menu::DeleteWallet(handler) => handler.handle(app_data).await, 
+            Menu::ImportWallet(handler) => handler.handle(app_data).await, 
             Menu::RecoverSol(handler) => handler.handle(app_data).await,
             Menu::CancelSnipe(handler) => handler.handle(app_data).await,
             Menu::CreateSnipe(handler) => handler.handle(app_data).await,
@@ -155,7 +162,7 @@ impl App {
     }
     pub async fn run(self, menu: Menu) {
         std::process::Command::new("clear").status().unwrap();
-        println!("{}", BANNER.bold());
+        println!("{}", style(BANNER).bold());
         
         if let Some(user) = &self.app_data.user.read().await.0 {
             let sniper_balance = user.wallets.iter().map(|(_, y)| y.sol_balance).reduce(|x, y| x + y).unwrap() as f64 / LAMPORTS_PER_SOL as f64;
@@ -163,8 +170,8 @@ impl App {
             println!(
                 "fee_payer: {}\nfee_payer_balance: {}\nsniper_sol_balance: {}",
                 user.public_key, 
-                format!("{} {}", user_balance, "SOL".cyan()),
-                format!("{} {}", sniper_balance, "SOL".cyan()),
+                format!("{} {}", user_balance, style("SOL").cyan()),
+                format!("{} {}", sniper_balance, style("SOL").cyan()),
             );
             if let Some(active_project) = &self.app_data.active_project.read().await.0 {
                 if let Some(project) = &self.app_data.projects.read().await.get(active_project) {
@@ -172,7 +179,7 @@ impl App {
                     println!(
                         "snipe_token_balance: {} {}",
                         format!("{}", sniper_token_balance),
-                        format!("{}", project.name.to_uppercase().bright_magenta())
+                        format!("{}", style(project.name.to_uppercase()).magenta())
                     )
                 }
             }
@@ -197,8 +204,8 @@ impl App {
                 "".to_string()
             };
 
-            println!("\n{}\n{}", "Websocket connection failed ⚠️".yellow(), error_message.dimmed());
-            Select::new()
+            println!("\n{}\n{}", style("Websocket connection failed ⚠️").yellow(), style(error_message).dim());
+            Select::with_theme(&ColorfulTheme::default())
                 .items(&vec!["Back"])
                 .default(0)
                 .interact()
@@ -211,8 +218,8 @@ impl App {
         if let Err((menu, err)) = handler_response {
             match err {
                 AppError::MoonboisClientError(MoonboisClientError::UnhandledServerError(err)) => {
-                    println!("{}\n  - {}", "Unhandled server error occured ⚠️".yellow(), err.dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Unhandled server error occured ⚠️").yellow(), style(err).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -221,8 +228,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::NotFound) => {
-                    println!("{}", "Requested resource was not found ⚠️".yellow());
-                    Select::new()
+                    println!("{}", style("Requested resource was not found ⚠️").yellow());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -231,8 +238,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::InvalidUri(err)) => {
-                    println!("{}\n  - {}", "Invalid URI ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Invalid URI ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -241,8 +248,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::JsonError(err)) => {
-                    println!("{}\n  - {}", "JSON error ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("JSON error ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -251,8 +258,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::MissingJWT) => {
-                    println!("{}", "Authorization failed ⚠️".yellow());
-                    Select::new()
+                    println!("{}", style("Authorization failed ⚠️").yellow());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -261,8 +268,8 @@ impl App {
                         let _ = Box::pin(App::run(self, Menu::Login(Login))).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::ParseError(err)) => {
-                    println!("{}\n  - {}", "Parse error occured ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Parse error occured ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -271,8 +278,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::ReqwestError(err)) => {
-                    println!("{}\n  - {}", "An error occured ⚠️".yellow(), err);
-                    Select::new()
+                    println!("{}\n  - {}", style("An error occured ⚠️").yellow(), err);
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -281,8 +288,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::MoonboisClientError(MoonboisClientError::NotAccepted) => {
-                    println!("{}\n  - {}", "Not accepted ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Not accepted ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -291,8 +298,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::ParsePubkeyError(err) => {
-                    println!("{}\n  - {}", "Invalid pubkey ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Invalid pubkey ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -301,8 +308,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::DialogueError(err) => {
-                    println!("{}\n  - {}", "Dialogue error occured ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Dialogue error occured ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -311,8 +318,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::ProjectNotFound => {
-                    println!("{}\n", "Project not found ⚠️".yellow());
-                    Select::new()
+                    println!("{}\n", style("Project not found ⚠️").yellow());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -321,8 +328,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::Unhandled(err) => {
-                    println!("{}\n - {}", "Unhandled error occured ⚠️".yellow(), err);
-                    Select::new()
+                    println!("{}\n - {}", style("Unhandled error occured ⚠️").yellow(), err);
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
@@ -331,8 +338,8 @@ impl App {
                         let _ = Box::pin(App::run(self, menu)).await;
                 }
                 AppError::UserNotFound => {
-                    println!("{}\n  - {}", "Unable to find user ⚠️".yellow(), err.to_string().dimmed());
-                    Select::new()
+                    println!("{}\n  - {}", style("Unable to find user ⚠️").yellow(), style(err.to_string()).dim());
+                    Select::with_theme(&ColorfulTheme::default())
                         .items(&vec!["Back"])
                         .default(0)
                         .interact()
