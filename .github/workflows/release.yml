@@ -132,18 +132,6 @@ jobs:
           cp target/${{ matrix.info.target }}/release/cli moonbois_${{ matrix.info.target }}
           echo "ASSET=moonbois_${{ matrix.info.target }}" >> $GITHUB_ENV
 
-      - name: Create release directory for artifact, move file
-        shell: bash
-        run: |
-          mkdir -p release
-          mv ${{ env.ASSET }} release/
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: moonbois-${{ matrix.info.target }}
-          path: release/
-
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
         with:
