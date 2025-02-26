@@ -45,9 +45,13 @@ jobs:
       - name: Install musl tools and OpenSSL dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools pkg-config libssl-dev  # Install musl-tools, pkg-config, and OpenSSL dev libs
+          sudo apt-get install -y musl-tools pkg-config libssl-dev
       - name: Set up cross-compilation for musl
         run: rustup target add x86_64-unknown-linux-musl
+      - name: Set environment variables for OpenSSL
+        run: |
+          export OPENSSL_DIR=/usr/local/openssl
+          export PKG_CONFIG_PATH=/usr/local/openssl/lib/pkgconfig
       - name: Build for musl
         run: cargo build --release --target x86_64-unknown-linux-musl
       - name: List target directory (for debugging)
