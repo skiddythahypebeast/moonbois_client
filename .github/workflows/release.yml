@@ -48,6 +48,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/moonbois_cli
-          asset_name: moonbois_cli
+          file: target/release/cli
+          asset_name: ubuntu_linux_moonbois_cli
           tag: ${{ github.ref_name }}
