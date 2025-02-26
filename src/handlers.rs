@@ -125,7 +125,6 @@ impl Handler for CreateSnipe {
             };
 
         let rpc_client = app_data.rpc_client.read().await;
-
         let result = Loader::new()
             .with_prompt("Creating snipe")
             .interact(rpc_client.create_snipe(deployer, wallet_count))
@@ -166,6 +165,7 @@ impl Handler for CancelSnipe {
             .with_prompt("cancel_snipe in progress")
             .interact(rpc_client.cancel_snipe(&self.deployer, &self.snipe_id))
             .await;
+        drop(rpc_client);
 
         if let Err(err) = result {
             return Err((Menu::Main(MainMenu), AppError::from(err)))
@@ -200,6 +200,7 @@ impl Handler for ImportWallet {
                 Ok(result) => result,
                 Err(err) => return Err((Menu::Main(MainMenu), AppError::from(err)))
             };
+        drop(rpc_client);
 
         let mut user = app_data.user.write().await;
         if let Some(ref mut user) = user.0 {
@@ -230,6 +231,7 @@ impl Handler for DeleteWallet {
             .with_prompt("delete_wallet in progress")
             .interact(rpc_client.delete_user_wallet(self.wallet.id))
             .await;
+        drop(rpc_client);
 
         if let Err(err) = result {
             return Err((Menu::Wallet(WalletMenu), AppError::from(err)))
@@ -293,6 +295,7 @@ impl Handler for DeleteProject {
                 .with_prompt("delete_project in progress")
                 .interact(rpc_client.delete_project(project_id))
                 .await;
+            drop(rpc_client);
     
             if let Err(err) = result {
                 return Err((Menu::Main(MainMenu), AppError::from(err)))
@@ -328,6 +331,7 @@ impl Handler for Sell {
                         .with_prompt("sell in progress")
                         .interact(rpc_client.sell(project_id, wallet.id))
                         .await;
+                    drop(rpc_client);
 
                     if let Err(err) = result {
                         return Err((Menu::ProjectMenu(ProjectMenu), AppError::from(err)))
@@ -344,6 +348,7 @@ impl Handler for Sell {
                 .with_prompt("auto_sell in progress")
                 .interact(rpc_client.auto_sell(project_id))
                 .await;
+            drop(rpc_client);
 
             if let Err(err) = result {
                 return Err((Menu::ProjectMenu(ProjectMenu), AppError::from(err)))
@@ -381,6 +386,7 @@ impl Handler for Buy {
                         .with_prompt("buy in progress")
                         .interact(rpc_client.buy(project_id, wallet.id, amount as u64))
                         .await;
+                    drop(rpc_client);
 
                     if let Err(err) = result {
                         return Err((Menu::ProjectMenu(ProjectMenu), AppError::from(err)))
@@ -407,6 +413,7 @@ impl Handler for Buy {
                 .with_prompt("buy in progress")
                 .interact(rpc_client.auto_buy(project_id, amount as u64))
                 .await;
+            drop(rpc_client);
 
             if let Err(err) = result {
                 return Err((Menu::ProjectMenu(ProjectMenu), AppError::from(err)))
@@ -433,6 +440,7 @@ impl Handler for CreateProject {
             .with_prompt("import_token in progress")
             .interact(rpc_client.create_project(mint_id))
             .await;
+        drop(rpc_client);
 
         let project = match result {
             Ok(project) => project,
@@ -594,6 +602,7 @@ impl Handler for MainMenu {
                 wallet.token_balance = None;
             }
         }
+        drop(user);
 
         let selection = match FuzzySelect::with_theme(&ColorfulTheme::default()).with_prompt("Main menu").default(0).items(vec![
             MainMenuOptions::Snipe,
@@ -642,6 +651,7 @@ impl Handler for RecoverSol {
             .with_prompt("recover_sol in progress")
             .interact(rpc_client.recover_sol())
             .await;
+        drop(rpc_client);
 
         if let Err(err) = result {
             return Err((Menu::Main(MainMenu), AppError::from(err)))
@@ -773,6 +783,7 @@ impl Handler for Withdraw {
             .with_prompt("withdraw in progress")
             .interact( rpc_client.transfer_sol_from_sniper(self.wallet.id, receiver, amount as u64))
             .await;
+        drop(rpc_client);
 
         if let Err(err) = result {
             return Err((Menu::Main(MainMenu), AppError::from(err)))
@@ -801,6 +812,7 @@ impl Handler for Deposit {
             .with_prompt("deposit in progress")
             .interact(rpc_client.transfer_sol_from_main(self.wallet.public_key, amount as u64))
             .await;
+        drop(rpc_client);
 
         if let Err(err) = result {
             return Err((Menu::Main(MainMenu), AppError::from(err)))
@@ -837,6 +849,7 @@ impl Handler for SendSOL {
             .with_prompt("send in progress")
             .interact(rpc_client.transfer_sol_from_sniper(self.wallet.id, receiver, amount as u64))
             .await;
+        drop(rpc_client);
 
         if let Err(err) = result {
             return Err((Menu::Main(MainMenu), AppError::from(err)))
@@ -853,6 +866,7 @@ impl Handler for Export {
         let export = rpc_client.export().await.map_err(|err| {
                 (Menu::Main(MainMenu), AppError::from(err))
             })?;
+        drop(rpc_client);
 
         println!("{:#?}", export);
         FuzzySelect::with_theme(&ColorfulTheme::default())
