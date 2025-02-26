@@ -1,6 +1,6 @@
 ## Building from source
 
-### It is highly recommended that if you are one windows that you should do all of this from within a windows subsystem for linux terminal
+> :warning: **If you are on windows** it is highly recommended you use a windows subsystem for linux terminal for these steps.
 
 ### 1. Install dependencies
 <a href="https://www.rust-lang.org/tools/install">Install Rust</a>
