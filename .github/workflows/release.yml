@@ -1,13 +1,11 @@
-name: release
-
+name: Handle release
 on: 
   release:
-  types:
-    - created
+    types: [created]
 
 jobs:
   release:
-    run-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
