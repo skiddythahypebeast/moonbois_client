@@ -2,8 +2,7 @@ name: Rust
 
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -35,12 +34,12 @@ jobs:
           draft: false
           prerelease: false
 
-  publish-gpr:
+  publish:
     needs: release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup rust/openssl
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Build binary
