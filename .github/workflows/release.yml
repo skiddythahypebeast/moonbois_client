@@ -42,12 +42,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup rust/openssl
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Build binary
-        run: cargo build --release
+      - name: Set up cross-compilation for musl
+        run: rustup target add x86_64-unknown-linux-musl
+      - name: Build for musl
+        run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: List target directory (for debugging)
+        run: ls -l target/x86_64-unknown-linux-musl/release/
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/cli
-          asset_name: ubuntu_linux_moonbois_cli
+          file: target/x86_64-unknown-linux-musl/release/cli
+          asset_name: moonbois_cli-linux-x86_64
           tag: ${{ github.ref_name }}
