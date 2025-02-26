@@ -114,7 +114,7 @@ jobs:
         uses: ClementTsang/cargo-action@v0.0.5
         with:
           command: build
-          args: --release --verbose --locked --target=${{ matrix.info.target }}
+          args: --release --verbose --target=${{ matrix.info.target }}
           use-cross: ${{ matrix.info.cross }}
           cross-version: 0.2.5
 
