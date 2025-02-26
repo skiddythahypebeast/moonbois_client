@@ -105,7 +105,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@21dc36fb71dd22e3317045c0c31a3f4249868b17
+        uses: actions-rust-lang/setup-rust-toolchain
         with:
           toolchain: stable
           target: ${{ matrix.info.target }}
