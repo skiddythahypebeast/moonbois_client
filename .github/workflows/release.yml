@@ -40,12 +40,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Setup rust/openssl
+      - name: Setup rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Install musl tools
+      - name: Install musl tools and OpenSSL dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
+          sudo apt-get install -y musl-tools pkg-config libssl-dev  # Install musl-tools, pkg-config, and OpenSSL dev libs
       - name: Set up cross-compilation for musl
         run: rustup target add x86_64-unknown-linux-musl
       - name: Build for musl
@@ -56,6 +56,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/x86_64-unknown-linux-musl/release/cli
+          file: target/x86_64-unknown-linux-musl/release/moonbois_cli
           asset_name: moonbois_cli-linux-x86_64
           tag: ${{ github.ref_name }}
