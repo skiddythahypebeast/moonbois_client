@@ -1,0 +1,25 @@
+name: release
+
+on: 
+  release:
+  types:
+    - created
+
+jobs:
+  release:
+    run-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup rust/openssl
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Build binary
+        run: cargo build --release
+      - name: Upload Dolmen binary to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/moonbois_cli
+          asset_name: moonbois_cli
+          tag: ${{ github.ref }}
