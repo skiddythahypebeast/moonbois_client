@@ -476,25 +476,33 @@ impl Handler for Login {
         let credentials = Credentials { signer };
 
         let mut rpc_client = app_data.rpc_client.write().await;
-        let login_result = rpc_client.login(&credentials).await;
-
-        if let Err(MoonboisClientError::NotFound) = login_result {
-            return Ok(Some(Menu::Signup(Signup { credentials })))
-        }
-
+        let login_result = Loader::new()
+            .with_prompt("logging in")
+            .interact(rpc_client.login(&credentials))
+            .await;
+        drop(rpc_client);
+        
         if let Err(err) = login_result {
+            if let MoonboisClientError::NotFound = err {
+                return Ok(Some(Menu::Signup(Signup { credentials })))
+            }
+
             return Err((Menu::Login(self), AppError::from(err)));
         }
 
-        if let Ok(()) = login_result {
-            let get_user_reponse = rpc_client.get_user().await;
-            if let Err(err) = get_user_reponse {
-                return Err((Menu::Login(self), AppError::from(err)));
-            } else if let Ok(user) = get_user_reponse {
-                let mut user_write = app_data.user.write().await;
-                user_write.0 = Some(user);
-                return Ok(Some(Menu::Main(MainMenu)))
-            }
+        let rpc_client = app_data.rpc_client.write().await;
+        let get_user_reponse = Loader::new()
+            .with_prompt("loading user")
+            .interact(rpc_client.get_user())
+            .await;
+        drop(rpc_client);
+    
+        if let Err(err) = get_user_reponse {
+            return Err((Menu::Login(self), AppError::from(err)));
+        } else if let Ok(user) = get_user_reponse {
+            let mut user_write = app_data.user.write().await;
+            user_write.0 = Some(user);
+            return Ok(Some(Menu::Main(MainMenu)))
         }
 
         return Err((Menu::Login(self), AppError::Unhandled("Unhandled error".to_string())));
@@ -519,24 +527,34 @@ impl Handler for Signup {
 
         if create_user {
             let mut rpc_client = app_data.rpc_client.write().await;
-            if let Err(err) = rpc_client.create_user(&credentials, &new_signer).await {
-                return Err((Menu::Signup(Signup { credentials }), AppError::from(err)));
-            }
-            
-            if let Err(err) = rpc_client.login(&credentials).await {
-                return Err((Menu::Signup(Signup { credentials }), AppError::from(err)));
-            }
+            if let Err(err) = Loader::new()
+                .with_prompt("creating user")
+                .interact(rpc_client.create_user(&credentials, &new_signer))
+                .await {
+                    return Err((Menu::Signup(Signup { credentials }), AppError::from(err)));
+                }
 
-            let get_user_reponse = rpc_client.get_user().await;
-            if let Err(err) = get_user_reponse {
-                return Err((Menu::Login(Login), AppError::from(err)));
-            } else if let Ok(user) = get_user_reponse {
-                let mut user_write = app_data.user.write().await;
-                user_write.0 = Some(user);
-                return Ok(Some(Menu::Main(MainMenu)))
-            }
+            if let Err(err) = Loader::new()
+                .with_prompt("logging in")
+                .interact(rpc_client.login(&credentials))
+                .await {
+                    return Err((Menu::Signup(Signup { credentials }), AppError::from(err)));
+                }
 
-            return Ok(Some(Menu::Main(MainMenu)))
+            let get_user_reponse = Loader::new()
+                .with_prompt("loading user")
+                .interact(rpc_client.get_user())
+                .await;
+            drop(rpc_client);
+
+            match get_user_reponse {
+                Ok(user) => {
+                    let mut user_write = app_data.user.write().await;
+                    user_write.0 = Some(user);
+                    return Ok(Some(Menu::Main(MainMenu)))
+                },
+                Err(err) => return Err((Menu::Login(Login), AppError::from(err)))
+            }
         }
 
         return Ok(Some(Menu::Login(Login)))
