@@ -101,6 +101,11 @@ jobs:
               cross: false,
             }
     steps:
+      - name: 
+        - if: runner.os == 'windows-latest'
+          run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          run: vcpkg install openssl:x64-windows-static-md
+          
       - name: Checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
@@ -112,13 +117,19 @@ jobs:
           toolchain: stable
           target: ${{ matrix.info.target }}
 
-      - name: Build
+      - name: Build linux & macos
+        if: ${{ !contains(matrix.platform.os, 'windows') }}
         uses: ClementTsang/cargo-action@v0.0.5
         with:
           command: build
           args: --release --verbose --target=${{ matrix.info.target }}
           use-cross: ${{ matrix.info.cross }}
           cross-version: 0.2.5
+
+      - name: Build windows
+        if: ${{ contains(matrix.platform.os, 'windows') }}
+        shell: powershell
+        run: cargo build --release --target ${{ matrix.info.target }}
 
       - name: Package release (Windows)
         if: matrix.info.os == 'windows-latest'
@@ -129,7 +140,7 @@ jobs:
 
       - name: Package release (Linux and macOS)
         if: matrix.info.os != 'windows-latest'
-        shell: bash
+        shell: bash 
         run: |
           cp target/${{ matrix.info.target }}/release/cli moonbois_${{ matrix.info.target }}
           echo "ASSET=moonbois_${{ matrix.info.target }}" >> $GITHUB_ENV
