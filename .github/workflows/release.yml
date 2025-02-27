@@ -100,12 +100,7 @@ jobs:
               target: "x86_64-pc-windows-gnu",
               cross: false,
             }
-    steps:
-      - name: 
-        - if: runner.os == 'windows-latest'
-          run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-          run: vcpkg install openssl:x64-windows-static-md
-          
+    steps:          
       - name: Checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
