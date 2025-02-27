@@ -22,10 +22,6 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     steps:
-      - name: Debug GITHUB_TOKEN permissions
-        run: gh auth status
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Create Release
