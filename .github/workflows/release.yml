@@ -125,14 +125,14 @@ jobs:
           cross-version: 0.2.5
 
       - name: Package release (Windows)
-        if: matrix.info.os == 'windows-2019'
+        if: matrix.info.os == 'windows-latest'
         shell: bash
         run: |
           cp target/${{ matrix.info.target }}/release/cli.exe moonbois_${{ matrix.info.target }}.exe
           echo "ASSET=moonbois_${{ matrix.info.target }}.exe" >> $GITHUB_ENV
 
       - name: Package release (Linux and macOS)
-        if: matrix.info.os != 'windows-2019'
+        if: matrix.info.os != 'windows-latest'
         shell: bash
         run: |
           cp target/${{ matrix.info.target }}/release/cli moonbois_${{ matrix.info.target }}
