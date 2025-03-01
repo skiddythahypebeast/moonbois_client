@@ -125,7 +125,7 @@ jobs:
         if: ${{ contains(matrix.platform.os, 'windows') }}
         shell: powershell
         run: |
-          choco install openssl -y
+          choco install openssl.openssl -y
           refreshenv
 
           $env:OPENSSL_DIR = "C:\Program Files\OpenSSL\"
