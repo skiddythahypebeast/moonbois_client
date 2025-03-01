@@ -124,14 +124,23 @@ jobs:
       - name: Build windows
         if: ${{ contains(matrix.platform.os, 'windows') }}
         shell: powershell
-        run: cargo build --release --target ${{ matrix.info.target }}
+        run: |
+          choco install openssl -y
+          refreshenv
+
+          $env:OPENSSL_DIR = "C:\Program Files\OpenSSL\"
+          $env:OPENSSL_LIB_DIR = "C:\Program Files\OpenSSL\lib"
+          $env:OPENSSL_INCLUDE_DIR = "C:\Program Files\OpenSSL\include"
+          $env:PKG_CONFIG_PATH = "C:\Program Files\OpenSSL\lib\pkgconfig"
+
+          cargo build --release --target ${{ matrix.info.target }}
 
       - name: Package release (Windows)
         if: matrix.info.os == 'windows-latest'
-        shell: bash
+        shell: powershell
         run: |
-          cp target/${{ matrix.info.target }}/release/cli.exe moonbois_${{ matrix.info.target }}.exe
-          echo "ASSET=moonbois_${{ matrix.info.target }}.exe" >> $GITHUB_ENV
+          Copy-Item "target\${{ matrix.info.target }}\release\cli.exe" -Destination "moonbois_${{ matrix.info.target }}.exe"
+          echo "ASSET=moonbois_${{ matrix.info.target }}.exe" | Out-File -Append -FilePath $env:GITHUB_ENV
 
       - name: Package release (Linux and macOS)
         if: matrix.info.os != 'windows-latest'
