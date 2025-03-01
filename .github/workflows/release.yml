@@ -41,7 +41,7 @@ jobs:
     needs: release
     continue-on-error: true
     container: ${{ matrix.info.container }}
-    timeout-minutes: 12
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
