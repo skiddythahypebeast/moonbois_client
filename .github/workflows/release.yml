@@ -52,12 +52,6 @@ jobs:
               os: "ubuntu-22.04",
               target: "x86_64-unknown-linux-gnu",
               cross: false,
-              generate-other-artifacts: true,
-            }
-          - {
-              os: "ubuntu-22.04",
-              target: "i686-unknown-linux-gnu",
-              cross: true,
             }
           - {
               os: "ubuntu-22.04",
@@ -67,11 +61,6 @@ jobs:
           - {
               os: "ubuntu-22.04",
               target: "i686-unknown-linux-musl",
-              cross: true,
-            }
-          - {
-              os: "ubuntu-22.04",
-              target: "aarch64-unknown-linux-gnu",
               cross: true,
             }
           - {
@@ -94,11 +83,6 @@ jobs:
               os: "windows-latest", 
               target: "i686-pc-windows-msvc", 
               cross: false 
-            }
-          - {
-              os: "windows-latest",
-              target: "x86_64-pc-windows-gnu",
-              cross: false,
             }
     steps:          
       - name: Checkout repository
