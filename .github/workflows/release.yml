@@ -9,8 +9,6 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: 0
   CARGO_HUSKY_DONT_INSTALL_HOOKS: true
-  COMPLETION_DIR: "target/tmp/moonbois/completion/"
-  MANPAGE_DIR: "target/tmp/moonbois/manpage/"
 
 permissions:
   id-token: write
@@ -46,33 +44,6 @@ jobs:
       fail-fast: false
       matrix:
         info:
-          # ======= Supported targets =======
-          # Linux (x86-64, x86, aarch64)
-          - {
-              os: "ubuntu-22.04",
-              target: "x86_64-unknown-linux-gnu",
-              cross: false,
-            }
-          - {
-              os: "ubuntu-22.04",
-              target: "x86_64-unknown-linux-musl",
-              cross: true,
-            }
-          - {
-              os: "ubuntu-22.04",
-              target: "i686-unknown-linux-musl",
-              cross: true,
-            }
-          - {
-              os: "ubuntu-22.04",
-              target: "aarch64-unknown-linux-musl",
-              cross: true,
-            }
-
-          # macOS (x86-64 and aarch64)
-          - { os: "macos-13", target: "x86_64-apple-darwin", cross: false }
-          - { os: "macos-14", target: "aarch64-apple-darwin", cross: false }
-
           # Windows (x86-64, x86)
           - {
               os: "windows-latest",
@@ -96,15 +67,6 @@ jobs:
           toolchain: stable
           target: ${{ matrix.info.target }}
 
-      - name: Build linux & macos
-        if: ${{ !contains(matrix.info.os, 'windows') }}
-        uses: ClementTsang/cargo-action@v0.0.5
-        with:
-          command: build
-          args: --release --verbose --target=${{ matrix.info.target }}
-          use-cross: ${{ matrix.info.cross }}
-          cross-version: 0.2.5
-
       - name: Build windows
         if: ${{ contains(matrix.info.os, 'windows') }}
         shell: powershell
@@ -123,15 +85,13 @@ jobs:
         if: matrix.info.os == 'windows-latest'
         shell: powershell
         run: |
-          Copy-Item "target\${{ matrix.info.target }}\release\cli.exe" -Destination "moonbois_${{ matrix.info.target }}.exe"
-          echo "ASSET=moonbois_${{ matrix.info.target }}.exe" | Out-File -Append -FilePath $env:GITHUB_ENV
+          choco install innosetup -y
+          refreshenv
 
-      - name: Package release (Linux and macOS)
-        if: matrix.info.os != 'windows-latest'
-        shell: bash 
-        run: |
-          cp target/${{ matrix.info.target }}/release/cli moonbois_${{ matrix.info.target }}
-          echo "ASSET=moonbois_${{ matrix.info.target }}" >> $GITHUB_ENV
+          iscc .\release.iss
+
+          Move-Item -Path ".\output\MoonboisSetup.exe" -Destination ".\MoonboisSetup.exe"
+          echo "ASSET=.\MoonboisSetup.exe" | Out-File -Append -FilePath "$env:GITHUB_ENV"
 
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2

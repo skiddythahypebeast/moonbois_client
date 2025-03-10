@@ -1,15 +1,17 @@
 [package]
-name = "cli"
+name = "moonbois_cli"
 version = "0.1.0"
 edition = "2021"
+default-run = "moonbois_cli"
 
 [dependencies]
-dialoguer = { git = "https://github.com/skiddythahypebeast/dialoguer.git", features = ["fuzzy-select"] }
+dialoguer = { git = "https://github.com/skiddythahypebeast/dialoguer.git", features = ["fuzzy-select"], tag = "v0.1.1" }
 dotenv = "0.15.0"
 reqwest = { version = "0.12.12", features = ["json", "blocking"] }
 serde = { version = "1.0.138", features = ["derive"] }
-moonbois_core = { git = "https://github.com/skiddythahypebeast/moonbois_core.git" }
+moonbois_core = { git = "https://github.com/skiddythahypebeast/moonbois_core.git", tag = "v0.2.1" }
 spl-associated-token-account = "6.0.0"
+spinoff = "0.8.0"
 serde_json = "1.0.138"
 console = "0.15.10"
 solana-client = "2.1.11"
