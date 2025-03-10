@@ -73,25 +73,29 @@ jobs:
         run: |
           choco install openssl -y
           refreshenv
-
+      
           $env:OPENSSL_DIR = "C:\Program Files\OpenSSL\"
           $env:OPENSSL_LIB_DIR = "C:\Program Files\OpenSSL\lib"
           $env:OPENSSL_INCLUDE_DIR = "C:\Program Files\OpenSSL\include"
           $env:PKG_CONFIG_PATH = "C:\Program Files\OpenSSL\lib\pkgconfig"
-
+      
           cargo build --release --target ${{ matrix.info.target }}
+
+          if (Test-Path "${{ github.workspace }}\target\release") {
+              Write-Host "Removing target/release directory"
+              Remove-Item -Recurse -Force "${{ github.workspace }}\target\release"
+          }
+
+          Move-Item -Path "${{ github.workspace }}\target\${{ matrix.info.target }}\release" -Destination "${{ github.workspace }}\target"
 
       - name: Package release (Windows)
         if: matrix.info.os == 'windows-latest'
         shell: powershell
         run: |
-          choco install innosetup -y
-          refreshenv
-
-          iscc .\release.iss
-
-          Move-Item -Path ".\output\MoonboisSetup.exe" -Destination ".\MoonboisSetup.exe"
-          echo "ASSET=.\MoonboisSetup.exe" | Out-File -Append -FilePath "$env:GITHUB_ENV"
+          iscc "${{ github.workspace }}\.inno\release.iss"
+      
+          Move-Item -Path "${{ github.workspace }}\.inno\output\MoonboisSetup.exe" -Destination "moonbois_installer_${{ matrix.info.target }}.exe"
+          echo "ASSET=moonbois_installer_${{ matrix.info.target }}.exe" | Out-File -Append -FilePath "$env:GITHUB_ENV"        
 
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
