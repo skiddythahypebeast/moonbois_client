@@ -40,7 +40,7 @@ Follow these steps to install the app:
 
 [windows32installer]: https://github.com/skiddythahypebeast/moonbois_client/releases/download/v0.2.0/moonbois_installer_i686-pc-windows-msvc.exe
 [windows64installer]: https://github.com/skiddythahypebeast/moonbois_client/releases/download/v0.2.0/moonbois_installer_x86_64-pc-windows-msvc.exe
-[wiki_home]: https://github.com/user-attachments/assets/b3bbc2b1-f725-40ea-9325-5554e8097ac6
+[wiki_home]: https://github.com/skiddythahypebeast/moonbois_client/wiki
 
 
 
@@ -49,5 +49,5 @@ Follow these steps to install the app:
 [main_preview]: https://github.com/user-attachments/assets/1f869b10-2245-48ea-9204-045fa0231f20
 [installer_img]: https://github.com/user-attachments/assets/c695c632-edea-4ed8-8824-77ce0586bd61
 [login_img]: https://github.com/user-attachments/assets/feb0c06f-9f46-442d-9551-9fbb250a6327
-[wiki_img]: https://github.com/user-attachments/assets/ff0d9bf2-26c1-4957-9cf1-29f84b84cd37
+[wiki_img]: https://github.com/user-attachments/assets/b3bbc2b1-f725-40ea-9325-5554e8097ac6
 
