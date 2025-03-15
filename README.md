@@ -32,7 +32,7 @@ Follow these steps to install the app:
 ![Login Image][login_img]
 
 4. **Start trading:**
-    - **Follow the guides outlined in the [wiki][wiki_home] to begin using the app**
+    - Follow the guides outlined in the [wiki][wiki_home] to begin using the app
 
 ![Wiki Image][wiki_img]
 
